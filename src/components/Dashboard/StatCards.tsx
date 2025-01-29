@@ -15,7 +15,7 @@ export const StatCards = () => {
   const [data, setData] = useState<CardData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  // Helper function to format timestamp
+
   const formatTimestamp = (timestamp: string) => {
     const year = timestamp.substring(0, 4);
     const month = timestamp.substring(4, 6);
@@ -24,48 +24,52 @@ export const StatCards = () => {
     const minute = timestamp.substring(10, 12);
     const second = timestamp.substring(12, 14);
 
-    // Create a new Date object from the parts
     const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
 
-    return date.toLocaleString(); // Returns the formatted date
+    return date.toLocaleString();
   };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("https://api.allorigins.win/raw?url=https://adaptfl-server.onrender.com/get_data");
+        const response = await fetch("https://adaptfl-server.onrender.com/get_data");
         if (!response.ok) {
           throw new Error("Failed to fetch data");
         }
 
         const result = await response.json();
+
+        if (!result.clients || !result.global_models || !result.global_aggregation) {
+          throw new Error("Incomplete data received from API");
+        }
+        if (result.clients.length === 0 || result.global_models.length === 0) {
+          throw new Error("No data available");
+        }
+
         const active_clients_count = result.clients.filter((client: any) => client.status === "active");
 
-        // Transform API data into the required CardData structure
         const cards: CardData[] = [
           {
             title: "Active Clients",
             value: `${active_clients_count.length}`,
-            pillText: `${(active_clients_count/result.clients.length)*100}`+"%",
+            pillText: `${(active_clients_count.length / result.clients.length) * 100}%`,
             trend: "up",
             period: "Total Clients: " + `${result.clients.length}`,
           },
           {
             title: "Global Model Version",
-            value: `v${Math.max(
-              ...result.global_models.map((model: any) => model.version)
-            )}`,
+            value: `${Math.max(...result.global_models.map((model: any) => model.version))}`,
             pillText: "+1 version",
             trend: "up",
-            period: "Latest Model Version",
+            period: "Aggregated On: " + `${new Date(result.global_models[result.global_models.length - 1].created_at).toLocaleString()}`,
           },
           {
-            title: "Last Processed Timestamp",
-            value: `${formatTimestamp(result.global_vars[0].value)}`,
+            title: "Last Checked At",
+            value: `${(result.last_checked_timestamp).toLocaleString()}`,
             pillText: "On Time",
             trend: "up",
-            period: "Latest Processing Time",
+            period: "",
           }
-          
         ];
 
         setData(cards);
@@ -113,9 +117,9 @@ const Card = ({
 }) => {
   return (
     <div className="col-span-4 p-4 rounded border border-stone-300">
-      <div className="flex mb-8 items-start justify-between">
+      <div className="flex mb-6 items-start justify-between">
         <div>
-          <h3 className="text-stone-500 mb-2 text-sm">{title}</h3>
+          <h1 className="text-stone-500 mb-2 text-sm">{title}</h1>
           <p className="text-3xl font-semibold">{value}</p>
         </div>
 
