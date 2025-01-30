@@ -65,7 +65,7 @@ export const StatCards = () => {
           },
           {
             title: "Last Checked At",
-            value: `${(result.last_checked_timestamp).toLocaleString()}`,
+            value: `${formatTimestamp(result.last_checked_timestamp)}`,
             pillText: "On Time",
             trend: "up",
             period: "",
