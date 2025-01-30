@@ -235,7 +235,7 @@ export const StatCards = () => {
           lastCheckedTimestamp = formatTimestamp(lastCheckedTimestamp);
         }
 
-        const active_clients_count = result.clients.filter((client: any) => client.status === "active");
+        const active_clients_count = result.clients.filter((client: any) => client.status === "Active");
 
         const cards: CardData[] = [
           {
