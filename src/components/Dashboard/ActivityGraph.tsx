@@ -37,26 +37,56 @@ export const ActivityGraph = () => {
 
         const result = await response.json();
 
-        // Process client data for the graph (contributions over time)
-        const contributionsByMinute: { [key: string]: number } = {};
+        // Create a map of all timestamps to ensure we have all time points
+        const timeMap = new Map();
+        
+        // Process both clients and models to get all unique timestamps
+        [...result.clients, ...result.global_models].forEach((item: Client | GlobalModel) => {
+          const timestamp = new Date(item.created_at);
+          const timeKey = timestamp.toISOString();
+          if (!timeMap.has(timeKey)) {
+            timeMap.set(timeKey, {
+              timestamp,
+              contributions: 0,
+              version: null
+            });
+          }
+        });
+
+        // Process client contributions
         result.clients.forEach((client: Client) => {
-          const minute = new Date(client.created_at).toLocaleString("default", { hour: "2-digit", minute: "2-digit" });
-          contributionsByMinute[minute] = (contributionsByMinute[minute] || 0) + client.contribution_count;
+          const timeKey = new Date(client.created_at).toISOString();
+          const existing = timeMap.get(timeKey);
+          existing.contributions += client.contribution_count;
         });
 
-        // Process global model data for the graph (model version over time)
-        const modelsByMinute: { [key: string]: number } = {};
+        // Process global model versions
         result.global_models.forEach((model: GlobalModel) => {
-          const minute = new Date(model.created_at).toLocaleString("default", { hour: "2-digit", minute: "2-digit" });
-          modelsByMinute[minute] = Math.max(modelsByMinute[minute] || 0, model.version); // Latest version for each minute
+          const timeKey = new Date(model.created_at).toISOString();
+          const existing = timeMap.get(timeKey);
+          existing.version = model.version;
         });
 
-        // Format data for the chart
-        const formattedData = Object.keys(contributionsByMinute).map((minute) => ({
-          name: minute, // Hour:Minute format
-          Contributions: contributionsByMinute[minute],
-          Version: modelsByMinute[minute] || 0, // If no model was created that minute, set version to 0
-        }));
+        // Convert map to array and sort by timestamp
+        const formattedData = Array.from(timeMap.values())
+          .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+          .map((item, index, array) => {
+            // Carry forward the last known version if current version is null
+            if (item.version === null && index > 0) {
+              item.version = array[index - 1].version;
+            }
+            
+            return {
+              name: item.timestamp.toLocaleString("default", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+              }),
+              Contributions: item.contributions,
+              Version: item.version || 0,
+              timestamp: item.timestamp // Keep for sorting
+            };
+          });
 
         setData(formattedData);
       } catch (err) {
@@ -69,26 +99,27 @@ export const ActivityGraph = () => {
     fetchData();
   }, []);
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error}</p>;
+  if (loading) return <div className="flex justify-center items-center h-80">Loading...</div>;
+  if (error) return <div className="flex justify-center items-center h-80 text-red-500">Error: {error}</div>;
+  if (data.length === 0) return <div className="flex justify-center items-center h-80">No data available</div>;
 
   return (
-    <div className="col-span-8 overflow-hidden rounded-lg border border-stone-300 shadow-lg">
-      <div className="p-4">
+    <div className="col-span-8 overflow-hidden rounded-lg border border-stone-300 shadow-lg bg-white">
+      <div className="p-4 border-stone-300">
         <h3 className="flex items-center gap-1.5 text-xl font-medium">
-          <FiUser /> Global Aggregation Over Time
+          <FiUser className="text-stone-600" /> Global Aggregation Over Time
         </h3>
       </div>
 
-      <div className="h-80 px-4">
+      <div className="h-80 px-4 py-2">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
             margin={{
-              top: 10,
-              right: -30,
-              left: -30,
-              bottom: 10,
+              top: 20,
+              right: 30,
+              left: 20,
+              bottom: 20,
             }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
@@ -96,55 +127,64 @@ export const ActivityGraph = () => {
               dataKey="name"
               axisLine={false}
               tickLine={false}
-              className="text-xs font-bold"
-              padding={{ right: 4 }}
+              tick={{ fontSize: 12 }}
+              interval="preserveStartEnd"
+              padding={{ left: 10, right: 10 }}
             />
             <YAxis
-              className="text-xs font-bold"
+              yAxisId="left"
               axisLine={false}
               tickLine={false}
-              yAxisId="left" // For client contributions
-            />
-            <YAxis
-              className="text-xs font-bold"
-              axisLine={false}
-              tickLine={false}
-              yAxisId="right" // For model versions
-              orientation="right"
-            />
-            <Tooltip
-              wrapperClassName="text-sm rounded bg-white shadow-lg"
-              labelClassName="text-xs text-stone-500"
-              contentStyle={{
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
-                borderRadius: "8px",
-                border: "1px solid #ddd",
-                padding: "10px",
+              tick={{ fontSize: 12 }}
+              label={{ 
+                value: 'Contributions', 
+                angle: -90, 
+                position: 'insideLeft',
+                style: { fontSize: 12 }
               }}
             />
-            <Line
-              type="monotone"
-              dataKey="Contributions"
-              stroke="#6a4cfc" // Purple line for contributions
-              fill="#6a4cfc"
-              strokeWidth={2}
-              dot={{ stroke: "#6a4cfc", strokeWidth: 2, r: 4 }} // Dots on line
-              activeDot={{ r: 6 }}
-              yAxisId="left"
-              isAnimationActive={true}
-              animationDuration={10}
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 12 }}
+              label={{ 
+                value: 'Version', 
+                angle: 90, 
+                position: 'insideRight',
+                style: { fontSize: 12 }
+              }}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "rgba(255, 255, 255, 0.95)",
+                borderRadius: "6px",
+                border: "1px solid #e4e4e7",
+                padding: "8px 12px",
+              }}
+              labelStyle={{ fontSize: 12, marginBottom: 4 }}
+              itemStyle={{ fontSize: 12, padding: "2px 0" }}
             />
             <Line
+              yAxisId="left"
               type="monotone"
-              dataKey="Version"
-              stroke="#2196f3" // Blue line for version
-              fill="#2196f3"
+              dataKey="Contributions"
+              stroke="#6366f1"
               strokeWidth={2}
-              dot={{ stroke: "#2196f3", strokeWidth: 2, r: 4 }} // Dots on line
+              dot={false}
               activeDot={{ r: 6 }}
+              name="Contributions"
+            />
+            <Line
               yAxisId="right"
-              isAnimationActive={true}
-              animationDuration={10}
+              type="stepAfter"
+              dataKey="Version"
+              stroke="#2563eb"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 6 }}
+              name="Version"
             />
           </LineChart>
         </ResponsiveContainer>
