@@ -45,6 +45,10 @@ export const StatCards = () => {
         if (result.clients.length === 0 || result.global_models.length === 0) {
           throw new Error("No data available");
         }
+        let lastCheckedTimestamp = result.last_checked_timestamp;
+        if (lastCheckedTimestamp !== "0") {
+          lastCheckedTimestamp = formatTimestamp(lastCheckedTimestamp);
+        }
 
         const active_clients_count = result.clients.filter((client: any) => client.status === "active");
 
@@ -65,7 +69,7 @@ export const StatCards = () => {
           },
           {
             title: "Last Checked At",
-            value: `${formatTimestamp(result.last_checked_timestamp)}`,
+            value: `${lastCheckedTimestamp}`,
             pillText: "On Time",
             trend: "up",
             period: "",
