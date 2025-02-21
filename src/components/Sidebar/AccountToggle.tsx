@@ -12,7 +12,7 @@ export const AccountToggle = () => {
         />
         <div className="text-start">
           <span className="text-sm font-bold block">Administrator</span>
-          <span className="text-xs block text-stone-500">admin@adaptfl.ai</span>
+          <span className="text-xs block text-stone-500">admin@collabai.ai</span>
         </div>
 
         <FiChevronDown className="absolute right-2 top-1/2 translate-y-[calc(-50%+4px)] text-xs" />
